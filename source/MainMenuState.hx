@@ -48,6 +48,16 @@ class MainMenuState extends MusicBeatState
 		'options'
 	];
 
+	public static var bgPaths:Array<String> = [
+		'mamakotomi',
+		'mantis',
+		'morie',
+		'Olyantwo',
+		'SUSSUS AMOGUS',
+		'SwagnotrllyTheMod',
+		'T5mpler'
+	];
+
 	#if MODS_ALLOWED
 	var customOption:String;
 	var	customOptionLink:String;
