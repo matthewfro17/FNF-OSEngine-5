@@ -17,6 +17,7 @@ import flixel.tweens.FlxTween;
 import lime.utils.Assets;
 import flixel.system.FlxSound;
 import openfl.utils.Assets as OpenFlAssets;
+import flixel.tweens.FlxEase;
 import WeekData;
 #if MODS_ALLOWED
 import sys.FileSystem;
@@ -124,12 +125,6 @@ class FreeplayState extends MusicBeatState
 		CurrentSongIcon.x = (FlxG.width / 2) - 256;
 		CurrentSongIcon.y = (FlxG.height / 2) - 256;
 		CurrentSongIcon.antialiasing = true;
-
-		NameAlpha = new Alphabet(40,(FlxG.height / 2) - 282,AllPossibleSongs[CurrentPack],true,false);
-		NameAlpha.x = (FlxG.width / 2) - 162;
-		Highscore.load();
-		add(NameAlpha);
-
 		add(CurrentSongIcon);
 
 		super.create();
@@ -333,10 +328,6 @@ class FreeplayState extends MusicBeatState
 		{
 			CurrentPack = 0;
 		}
-		NameAlpha.destroy();
-		NameAlpha = new Alphabet(40,(FlxG.height / 2) - 282,AllPossibleSongs[CurrentPack],true,false);
-		NameAlpha.x = (FlxG.width / 2) - 164;
-		add(NameAlpha);
 		CurrentSongIcon.loadGraphic(Paths.image('week_icons_' + (AllPossibleSongs[CurrentPack].toLowerCase())));
 	}
 
