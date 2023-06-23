@@ -89,8 +89,6 @@ class FreeplayState extends MusicBeatState
         0xFFAF3700 //THE DUO 2
     ];
 
-	private var iconArray:Array<HealthIcon> = [];
-
 	override function create()
 	{
 
@@ -214,11 +212,6 @@ class FreeplayState extends MusicBeatState
 		changeSelection(0, false);
 		persistentUpdate = true;
 		super.closeSubState();
-	}
-
-	public function addSong(songName:String, weekNum:Int, songCharacter:String, color:Int)
-	{
-		songs.push(new SongMetadata(songName, weekNum, songCharacter, color));
 	}
 
 	function weekIsLocked(name:String):Bool {
