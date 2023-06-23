@@ -1,22 +1,27 @@
 package;
 
-import flixel.util.FlxTimer;
-import flixel.tweens.FlxEase;
+#if desktop
+import Discord.DiscordClient;
+#end
+import editors.ChartingState;
 import flash.text.TextField;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.addons.display.FlxGridOverlay;
+import flixel.addons.transition.FlxTransitionableState;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.math.FlxMath;
 import flixel.text.FlxText;
 import flixel.util.FlxColor;
 import flixel.tweens.FlxTween;
-import flixel.util.FlxStringUtil;
 import lime.utils.Assets;
 import flixel.system.FlxSound;
-#if desktop
-import Discord.DiscordClient;
+import openfl.utils.Assets as OpenFlAssets;
+import WeekData;
+#if MODS_ALLOWED
+import sys.FileSystem;
 #end
+
 using StringTools;
 
 class FreeplayState extends MusicBeatState
@@ -24,30 +29,35 @@ class FreeplayState extends MusicBeatState
 	var songs:Array<SongMetadata> = [];
 
 	var selector:FlxText;
-	var curSelected:Int = 0;
-	var curDifficulty:Int = 1;
+	private static var curSelected:Int = 0;
+	var curDifficulty:Int = -1;
+	private static var lastDifficultyName:String = '';
 
-	var bg:FlxSprite = new FlxSprite().loadGraphic(Paths.image('backgrounds/SUSSUS AMOGUS'));
-
+	var scoreBG:FlxSprite;
 	var scoreText:FlxText;
 	var diffText:FlxText;
 	var lerpScore:Int = 0;
+	var lerpRating:Float = 0;
 	var intendedScore:Int = 0;
+	var intendedRating:Float = 0;
 
 	private var grpSongs:FlxTypedGroup<Alphabet>;
 	private var curPlaying:Bool = false;
-	private var curChar:String = "unknown";
 
 	private var InMainFreeplayState:Bool = false;
 
 	private var CurrentSongIcon:FlxSprite;
 
+	private var iconArray:Array<HealthIcon> = [];
+	
 	private var AllPossibleSongs:Array<String> = ['main', 'davo', 'extras', 'old', 'joke', 'purgatory', 'covers'];
 	private var Catagories:Array<String> = ['main', 'davo', 'extras', 'old', 'joke', 'purgatory', 'covers'];
 
-	private var CurrentPack:Int = 0;
+	var bg:FlxSprite;
+	var intendedColor:Int;
+	var colorTween:FlxTween;
 
-	private var NameAlpha:Alphabet;
+	private var CurrentPack:Int = 0;
 
 	var loadingPack:Bool = false;
 
@@ -205,6 +215,38 @@ class FreeplayState extends MusicBeatState
 		}
 	}
 
+	override function closeSubState() {
+		changeSelection(0, false);
+		persistentUpdate = true;
+		super.closeSubState();
+	}
+
+	public function addSong(songName:String, weekNum:Int, songCharacter:String, color:Int)
+	{
+		songs.push(new SongMetadata(songName, weekNum, songCharacter, color));
+	}
+
+	function weekIsLocked(name:String):Bool {
+		var leWeek:WeekData = WeekData.weeksLoaded.get(name);
+		return (!leWeek.startUnlocked && leWeek.weekBefore.length > 0 && (!StoryMenuState.weekCompleted.exists(leWeek.weekBefore) || !StoryMenuState.weekCompleted.get(leWeek.weekBefore)));
+	}
+
+	/*public function addWeek(songs:Array<String>, weekNum:Int, weekColor:Int, ?songCharacters:Array<String>)
+	{
+		if (songCharacters == null)
+			songCharacters = ['bf'];
+
+		var num:Int = 0;
+		for (song in songs)
+		{
+			addSong(song, weekNum, songCharacters[num]);
+			this.songs[this.songs.length-1].color = weekColor;
+
+			if (songCharacters.length != 1)
+				num++;
+		}
+	}*/
+
 	public function GoToActualFreeplay()
 	{
 		grpSongs = new FlxTypedGroup<Alphabet>();
@@ -324,53 +366,30 @@ class FreeplayState extends MusicBeatState
 	var holdTime:Float = 0;
 	override function update(elapsed:Float)
 	{
-		super.update(elapsed);
-
-
-		if (!InMainFreeplayState) 
-		{
-			if (controls.LEFT_P)
-			{
-				UpdatePackSelection(-1);
-			}
-			if (controls.RIGHT_P)
-			{
-				UpdatePackSelection(1);
-			}
-			if (controls.ACCEPT && !loadingPack)
-			{
-				loadingPack = true;
-				LoadProperPack();
-				FlxTween.tween(CurrentSongIcon, {alpha: 0}, 0.3);
-				FlxTween.tween(NameAlpha, {alpha: 0}, 0.3);
-				new FlxTimer().start(0.5, function(Dumbshit:FlxTimer)
-				{
-					CurrentSongIcon.visible = false;
-					NameAlpha.visible = false;
-					GoToActualFreeplay();
-					InMainFreeplayState = true;
-					loadingPack = false;
-				});
-			}
-			if (controls.BACK)
-			{
-				FlxG.switchState(new MainMenuState());
-			}	
-		
-			return;
-		}
-
 		if (FlxG.sound.music.volume < 0.7)
 		{
 			FlxG.sound.music.volume += 0.5 * FlxG.elapsed;
 		}
 
-		lerpScore = Math.floor(FlxMath.lerp(lerpScore, intendedScore, 0.4));
+		lerpScore = Math.floor(FlxMath.lerp(lerpScore, intendedScore, CoolUtil.boundTo(elapsed * 24, 0, 1)));
+		lerpRating = FlxMath.lerp(lerpRating, intendedRating, CoolUtil.boundTo(elapsed * 12, 0, 1));
 
 		if (Math.abs(lerpScore - intendedScore) <= 10)
 			lerpScore = intendedScore;
+		if (Math.abs(lerpRating - intendedRating) <= 0.01)
+			lerpRating = intendedRating;
 
-		scoreText.text = "PERSONAL BEST:" + lerpScore;
+		var ratingSplit:Array<String> = Std.string(Highscore.floorDecimal(lerpRating * 100, 2)).split('.');
+		if(ratingSplit.length < 2) { //No decimals, add an empty space
+			ratingSplit.push('');
+		}
+		
+		while(ratingSplit[1].length < 2) { //Less than 2 decimals in it, add decimals then
+			ratingSplit[1] += '0';
+		}
+
+		scoreText.text = 'PERSONAL BEST: ' + lerpScore + ' (' + ratingSplit.join('.') + '%)';
+		positionHighscore();
 
 		var upP = controls.UI_UP_P;
 		var downP = controls.UI_DOWN_P;
@@ -378,19 +397,48 @@ class FreeplayState extends MusicBeatState
 		var space = FlxG.keys.justPressed.SPACE;
 		var ctrl = FlxG.keys.justPressed.CONTROL;
 
-		if (upP)
+		var shiftMult:Int = 1;
+		if(FlxG.keys.pressed.SHIFT) shiftMult = 3;
+
+		if(songs.length > 1)
 		{
-			changeSelection(-1);
+			if (upP)
+			{
+				changeSelection(-shiftMult);
+				holdTime = 0;
+			}
+			if (downP)
+			{
+				changeSelection(shiftMult);
+				holdTime = 0;
+			}
+
+			if(controls.UI_DOWN || controls.UI_UP)
+			{
+				var checkLastHold:Int = Math.floor((holdTime - 0.5) * 10);
+				holdTime += elapsed;
+				var checkNewHold:Int = Math.floor((holdTime - 0.5) * 10);
+
+				if(holdTime > 0.5 && checkNewHold - checkLastHold > 0)
+				{
+					changeSelection((checkNewHold - checkLastHold) * (controls.UI_UP ? -shiftMult : shiftMult));
+					changeDiff();
+				}
+			}
+
+			if(FlxG.mouse.wheel != 0)
+			{
+				FlxG.sound.play(Paths.sound('scrollMenu'), 0.2);
+				changeSelection(-shiftMult * FlxG.mouse.wheel, false);
+				changeDiff();
+			}
 		}
-		if (downP)
-		{
-			changeSelection(1);
-		}
+
 		if (controls.UI_LEFT_P)
 			changeDiff(-1);
-		if (controls.UI_RIGHT_P)
+		else if (controls.UI_RIGHT_P)
 			changeDiff(1);
-
+		else if (upP || downP) changeDiff();
 
 		if (controls.BACK)
 		{
